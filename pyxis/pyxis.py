@@ -6,7 +6,7 @@
 from __future__ import division, print_function
 
 import numpy as np
-
+import collections
 try:
     import lmdb
 except ImportError:
@@ -372,13 +372,14 @@ class Writer(object):
         size of the data this object tries to write cannot exceed this number.
         Default is `2` GB.
     """
+    get_meta_str = Reader.get_meta_str
 
-    def __init__(self, dirpath, map_size_limit, ram_gb_limit=2):
+    def __init__(self, dirpath, map_size_limit, ram_gb_limit=2, append=False):
         self.dirpath = dirpath
         self.map_size_limit = int(map_size_limit)  # Megabytes (MB)
         self.ram_gb_limit = float(ram_gb_limit)  # Gigabytes (GB)
         self.keys = []
-        self.nb_samples = 0
+        
 
         # Minor sanity checks
         if self.map_size_limit <= 0:
@@ -400,6 +401,14 @@ class Writer(object):
         self.data_db = self._lmdb_env.open_db(DATA_DB)
         self.meta_db = self._lmdb_env.open_db(META_DB)
 
+        if not append:
+            self.nb_samples = 0
+            with self._lmdb_env.begin(write=True) as txn:
+                txn.drop(self.data_db,delete=False)
+                txn.drop(self.meta_db,delete=False)
+        else:
+            self.nb_samples = int(self.get_meta_str(NB_SAMPLES))
+
     def put_samples(self, *args):
         """Put the incoming argument keys and values in the `data_db` LMDB.
 
@@ -418,7 +427,7 @@ class Writer(object):
         *args: see above
         """
         # Select `*args` style
-        if len(args) == 1 and isinstance(args[0], dict):
+        if len(args) == 1:
             samples = args[0]
         else:
             if not len(args) % 2 == 0:
