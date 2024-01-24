@@ -313,7 +313,10 @@ class Reader(object):
         elif isinstance(key, slice):
             return [self[i] for i in range(*key.indices(len(self)))]
         else:
-            raise TypeError("Invalid argument type: `{}`".format(type(key)))
+            try:
+                return self.__getitem__(key.item())
+            except AttributeError:
+                raise TypeError("Invalid argument type: `{}`".format(type(key)))
 
     def __getslice__(self, i, j):
         """Python 2.* slicing compatibility: delegate to `__getitem__`.
